@@ -6,16 +6,16 @@ export class User extends BaseEntity {
   @Column({ length: 50, unique: true })
   nickname: string;
 
-  @Column({ unique: true })
-  email: string;
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  email: string | null;
 
-  @Column({ name: 'profile_image', nullable: true })
-  profileImage: string;
+  @Column({ type: 'varchar', name: 'profile_image', nullable: true })
+  profileImage: string | null;
 
   @Column({ name: 'social_provider', length: 20 })
   socialProvider: string; // 'kakao' | 'google' | 'apple'
 
-  @Column({ name: 'social_id' })
+  @Column({ name: 'social_id', unique: true })
   socialId: string;
 
   @Column({ name: 'is_active', default: true })
