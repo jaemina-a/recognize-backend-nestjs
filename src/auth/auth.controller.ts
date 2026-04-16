@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
+import { MockLoginDto } from './dto/mock-login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -17,6 +18,11 @@ export class AuthController {
   @Post('kakao')
   async kakaoLogin(@Body() dto: KakaoLoginDto) {
     return this.authService.kakaoLogin(dto.accessToken);
+  }
+
+  @Post('mock')
+  async mockLogin(@Body() dto: MockLoginDto) {
+    return this.authService.mockLogin(dto.nickname);
   }
 
   @Post('refresh')

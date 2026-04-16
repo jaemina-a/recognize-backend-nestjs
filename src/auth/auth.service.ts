@@ -126,6 +126,33 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
+  async mockLogin(nickname: string) {
+    const socialId = `mock-${nickname}`;
+    let user = await this.userRepository.findOne({
+      where: { socialId, socialProvider: 'mock' },
+    });
+    if (!user) {
+      user = this.userRepository.create({
+        nickname,
+        socialProvider: 'mock',
+        socialId,
+        profileImage: null,
+        email: null,
+      });
+      user = await this.userRepository.save(user);
+    }
+    const tokens = await this.generateTokens(user);
+    return {
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        profileImage: user.profileImage,
+        provider: user.socialProvider,
+      },
+      ...tokens,
+    };
+  }
+
   async refreshAccessToken(refreshToken: string) {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {

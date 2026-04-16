@@ -1,0 +1,31 @@
+import { Column, Entity, ManyToOne, JoinColumn, Unique } from 'typeorm';
+import { BaseEntity } from '../../common/entities/base.entity';
+import { User } from '../../users/entities/user.entity';
+import { Room } from '../../rooms/entities/room.entity';
+
+@Entity('photos')
+@Unique(['roomId', 'uploaderId'])
+export class Photo extends BaseEntity {
+  @Column({ name: 'room_id' })
+  roomId: string;
+
+  @ManyToOne(() => Room)
+  @JoinColumn({ name: 'room_id' })
+  room: Room;
+
+  @Column({ name: 'uploader_id' })
+  uploaderId: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'uploader_id' })
+  uploader: User;
+
+  @Column({ name: 'photo_url' })
+  photoUrl: string;
+
+  @Column({ name: 'uploaded_at', type: 'timestamp', default: () => 'NOW()' })
+  uploadedAt: Date;
+
+  @Column({ name: 'is_recognized', default: false })
+  isRecognized: boolean;
+}
