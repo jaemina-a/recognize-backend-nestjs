@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ChatService } from '../chat/chat.service';
 import { Room } from './entities/room.entity';
 import { RoomMember } from './entities/room-member.entity';
 import { randomBytes } from 'crypto';
@@ -20,6 +21,7 @@ export class RoomsService {
     private readonly roomRepository: Repository<Room>,
     @InjectRepository(RoomMember)
     private readonly roomMemberRepository: Repository<RoomMember>,
+    private readonly chatService: ChatService,
   ) {}
 
   async createRoom(userId: string, name: string) {
@@ -39,6 +41,9 @@ export class RoomsService {
       score: 0,
     });
     await this.roomMemberRepository.save(member);
+
+    // 방 생성 시 채팅방도 함께 생성
+    await this.chatService.ensureChatRoomForRoom(savedRoom.id);
 
     return this.getRoomDetail(savedRoom.id, userId);
   }
@@ -106,6 +111,14 @@ export class RoomsService {
       score: 0,
     });
     await this.roomMemberRepository.save(member);
+
+    // 채팅방이 없으면 생성 + 시스템 메시지
+    const chatRoom = await this.chatService.ensureChatRoomForRoom(room.id);
+    await this.chatService.createSystemMessage(
+      chatRoom.id,
+      'member_joined',
+      { userId },
+    );
 
     return this.getRoomDetail(room.id, userId);
   }

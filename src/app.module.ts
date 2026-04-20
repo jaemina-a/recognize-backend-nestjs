@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { ChatModule } from './chat/chat.module';
 import { DevModule } from './dev/dev.module';
 import { PhotosModule } from './photos/photos.module';
 import { RoomsModule } from './rooms/rooms.module';
@@ -38,6 +39,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     RoomsModule,
     PhotosModule,
+    ChatModule,
     DevModule,
   ],
   controllers: [AppController],

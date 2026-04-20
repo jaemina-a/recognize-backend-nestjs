@@ -13,8 +13,6 @@ export class DevController {
   async reset() {
     await this.dataSource.query(`
       TRUNCATE TABLE
-        recognition_logs,
-        recognitions,
         photos,
         room_members,
         rooms

@@ -51,14 +51,6 @@ export class PhotosController {
     return this.photosService.getFeed(roomId, req.user.userId);
   }
 
-  @Post('photos/:photoId/recognize')
-  async recognizePhoto(
-    @Request() req: { user: { userId: string } },
-    @Param('photoId') photoId: string,
-  ) {
-    return this.photosService.recognizePhoto(photoId, req.user.userId);
-  }
-
   @Get('rooms/:roomId/calendar')
   async getCalendar(
     @Request() req: { user: { userId: string } },
@@ -72,5 +64,14 @@ export class PhotosController {
       parseInt(year),
       parseInt(month),
     );
+  }
+
+  @Get('rooms/:roomId/photos/by-date')
+  async getPhotosByDate(
+    @Request() req: { user: { userId: string } },
+    @Param('roomId') roomId: string,
+    @Query('date') date: string,
+  ) {
+    return this.photosService.getPhotosByDate(roomId, req.user.userId, date);
   }
 }
