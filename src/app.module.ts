@@ -41,6 +41,11 @@ import { LoggingInterceptor } from './common/logging.interceptor';
         // 부팅 시 자동 마이그레이션 실행 (DB_MIGRATIONS_RUN=true 일 때)
         migrationsRun: configService.get<string>('DB_MIGRATIONS_RUN') === 'true',
         logging: configService.get<string>('DB_LOGGING') === 'true',
+        // RDS 등 SSL 강제 환경에서 DB_SSL=true 로 설정
+        ssl:
+          configService.get<string>('DB_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
     }),
     UsersModule,
