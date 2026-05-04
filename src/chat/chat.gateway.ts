@@ -19,7 +19,8 @@ type ReadPayload = { chatRoomId: string; lastReadId?: string };
 
 const roomKey = (chatRoomId: string) => `chat:${chatRoomId}`;
 
-@WebSocketGateway({ namespace: '/chat', cors: { origin: '*' } })
+// CORS는 main.ts의 CorsIoAdapter에서 환경변수 기반으로 동적 설정.
+@WebSocketGateway({ namespace: '/chat' })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
 

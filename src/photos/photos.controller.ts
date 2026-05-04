@@ -10,36 +10,27 @@ import {
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { randomUUID } from 'crypto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PhotosService } from './photos.service';
+import { StorageService } from '../storage/storage.service';
+import type { UploadedFileInfo } from '../storage/storage.service';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class PhotosController {
-  constructor(private readonly photosService: PhotosService) {}
+  constructor(
+    private readonly photosService: PhotosService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Post('rooms/:roomId/photos')
-  @UseInterceptors(
-    FileInterceptor('photo', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (_req, file, cb) => {
-          const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
-      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-    }),
-  )
+  @UseInterceptors(FileInterceptor('photo'))
   async uploadPhoto(
     @Request() req: { user: { userId: string } },
     @Param('roomId') roomId: string,
-    @UploadedFile() file: { filename: string; originalname: string },
+    @UploadedFile() file: UploadedFileInfo,
   ) {
-    const photoUrl = `uploads/${file.filename}`;
+    const photoUrl = this.storage.resolveUploadedUrl(file);
     return this.photosService.uploadPhoto(roomId, req.user.userId, photoUrl);
   }
 

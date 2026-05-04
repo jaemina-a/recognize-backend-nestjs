@@ -1,0 +1,45 @@
+# Node
+node_modules
+npm-debug.log*
+yarn-debug.log*
+
+# Build output
+dist
+build
+coverage
+
+# Environment / secrets — 컨테이너에는 런타임 환경변수로 주입
+.env
+.env.*
+!.env.example
+
+# Local uploads (S3로 이전됨)
+uploads
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+test
+**/*.spec.ts
+**/*.e2e-spec.ts
+
+# Docs
+README.md
+*.md
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml

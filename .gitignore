@@ -44,6 +44,9 @@ lerna-debug.log*
 .temp
 .tmp
 
+# Local uploaded files (운영은 S3 사용)
+/uploads
+
 # Runtime data
 pids
 *.pid

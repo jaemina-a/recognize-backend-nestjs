@@ -9,8 +9,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { Photo } from './entities/photo.entity';
 import { RoomMember } from '../rooms/entities/room-member.entity';
 import { User } from '../users/entities/user.entity';
-import * as fs from 'fs';
-import * as path from 'path';
+import { StorageService } from '../storage/storage.service';
 
 type PhotoDto = {
   id: string;
@@ -30,6 +29,7 @@ export class PhotosService {
     @InjectRepository(RoomMember)
     private readonly roomMemberRepository: Repository<RoomMember>,
     private readonly dataSource: DataSource,
+    private readonly storage: StorageService,
   ) {}
 
   // ============================================================
@@ -99,10 +99,7 @@ export class PhotosService {
       .getOne();
 
     if (existingToday) {
-      if (existingToday.photoUrl.startsWith('uploads/')) {
-        const filePath = path.resolve(existingToday.photoUrl);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      }
+      await this.storage.delete(existingToday.photoUrl);
       existingToday.photoUrl = photoUrl;
       existingToday.uploadedAt = new Date();
       await this.photoRepository.save(existingToday);

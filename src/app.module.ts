@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -9,6 +11,9 @@ import { DevModule } from './dev/dev.module';
 import { PhotosModule } from './photos/photos.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { UsersModule } from './users/users.module';
+import { StorageModule } from './storage/storage.module';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { LoggingInterceptor } from './common/logging.interceptor';
 
 @Module({
   imports: [
@@ -29,20 +34,34 @@ import { UsersModule } from './users/users.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        autoLoadEntities: true, // Entity 자동 로드\
-        //TODO synchronize옵션은 개발환경에서만 true로 설정. 이후 배포 시 false로 변경 필요
+        autoLoadEntities: true,
+        // 운영에서는 반드시 false. 스키마 변경은 마이그레이션으로 관리.
         synchronize: configService.get<string>('DB_SYNCHRONIZE') === 'true',
+        migrations: [__dirname + '/migrations/*.{js,ts}'],
+        // 부팅 시 자동 마이그레이션 실행 (DB_MIGRATIONS_RUN=true 일 때)
+        migrationsRun: configService.get<string>('DB_MIGRATIONS_RUN') === 'true',
         logging: configService.get<string>('DB_LOGGING') === 'true',
       }),
     }),
     UsersModule,
     AuthModule,
     RoomsModule,
+    StorageModule,
     PhotosModule,
     ChatModule,
-    DevModule,
+    // DevModule은 운영에 절대 노출되면 안 됨 (DB reset 등 위험 행위 포함)
+    ...(process.env.NODE_ENV !== 'production' ? [DevModule] : []),
+    // Rate limit: 1분당 100req (기본). 라우트별 @Throttle 로 강화 가능.
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 100 },
+    ]),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+  ],
 })
 export class AppModule {}
