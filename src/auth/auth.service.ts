@@ -62,7 +62,7 @@ export class AuthService {
       );
     }
 
-    return response.json();
+    return response.json() as Promise<KakaoUserInfo>;
   }
 
   private async findOrCreateUser(kakaoUser: KakaoUserInfo): Promise<User> {
@@ -115,11 +115,11 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION') as any,
+        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION')!,
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION') as any,
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION')!,
       }),
     ]);
 
@@ -155,7 +155,7 @@ export class AuthService {
 
   async refreshAccessToken(refreshToken: string) {
     try {
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
+      const payload = await this.jwtService.verifyAsync<{ sub: string; nickname: string }>(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
@@ -170,7 +170,7 @@ export class AuthService {
       const newPayload = { sub: user.id, nickname: user.nickname };
       const accessToken = await this.jwtService.signAsync(newPayload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION') as any,
+        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION')!,
       });
 
       return { accessToken };
