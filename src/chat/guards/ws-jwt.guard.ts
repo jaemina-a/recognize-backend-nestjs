@@ -34,8 +34,10 @@ export class WsJwtGuard implements CanActivate {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       });
 
-      (client.data as { userId: string; nickname: string }).userId = payload.sub;
-      (client.data as { userId: string; nickname: string }).nickname = payload.nickname;
+      (client.data as { userId: string; nickname: string }).userId =
+        payload.sub;
+      (client.data as { userId: string; nickname: string }).nickname =
+        payload.nickname;
       return true;
     } catch (err) {
       this.logger.warn(`WS auth failed: ${(err as Error).message}`);

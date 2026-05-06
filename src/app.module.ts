@@ -39,7 +39,8 @@ import { LoggingInterceptor } from './common/logging.interceptor';
         synchronize: configService.get<string>('DB_SYNCHRONIZE') === 'true',
         migrations: [__dirname + '/migrations/*.{js,ts}'],
         // 부팅 시 자동 마이그레이션 실행 (DB_MIGRATIONS_RUN=true 일 때)
-        migrationsRun: configService.get<string>('DB_MIGRATIONS_RUN') === 'true',
+        migrationsRun:
+          configService.get<string>('DB_MIGRATIONS_RUN') === 'true',
         logging: configService.get<string>('DB_LOGGING') === 'true',
         // RDS 등 SSL 강제 환경에서 DB_SSL=true 로 설정
         ssl:
@@ -57,9 +58,7 @@ import { LoggingInterceptor } from './common/logging.interceptor';
     // DevModule은 운영에 절대 노출되면 안 됨 (DB reset 등 위험 행위 포함)
     ...(process.env.NODE_ENV !== 'production' ? [DevModule] : []),
     // Rate limit: 1분당 100req (기본). 라우트별 @Throttle 로 강화 가능.
-    ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 100 },
-    ]),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
   ],
   controllers: [AppController],
   providers: [

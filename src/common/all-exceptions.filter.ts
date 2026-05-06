@@ -27,7 +27,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const isHttp = exception instanceof HttpException;
     const status = isHttp
-      ? exception.getResponse() && (exception as HttpException).getStatus()
+      ? exception.getResponse() && exception.getStatus()
       : HttpStatus.INTERNAL_SERVER_ERROR;
 
     let message: unknown;
@@ -46,7 +46,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else {
       const isProd = process.env.NODE_ENV === 'production';
-      message = isProd ? 'Internal server error' : (exception as Error)?.message ?? 'Unknown';
+      message = isProd
+        ? 'Internal server error'
+        : ((exception as Error)?.message ?? 'Unknown');
       error = 'InternalServerError';
       this.logger.error(
         `Unhandled ${req.method} ${req.url}`,

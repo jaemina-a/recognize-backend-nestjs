@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
+import type { StringValue } from 'ms';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 
@@ -45,21 +46,16 @@ export class AuthService {
     };
   }
 
-  private async getKakaoUserInfo(
-    accessToken: string,
-  ): Promise<KakaoUserInfo> {
+  private async getKakaoUserInfo(accessToken: string): Promise<KakaoUserInfo> {
     const response = await fetch('https://kapi.kakao.com/v2/user/me', {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Content-Type':
-          'application/x-www-form-urlencoded;charset=utf-8',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
       },
     });
 
     if (!response.ok) {
-      throw new UnauthorizedException(
-        '카카오 토큰이 유효하지 않습니다.',
-      );
+      throw new UnauthorizedException('카카오 토큰이 유효하지 않습니다.');
     }
 
     return response.json() as Promise<KakaoUserInfo>;
@@ -115,11 +111,15 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION')!,
+        expiresIn: this.configService.get<string>(
+          'JWT_ACCESS_EXPIRATION',
+        ) as StringValue,
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION')!,
+        expiresIn: this.configService.get<string>(
+          'JWT_REFRESH_EXPIRATION',
+        ) as StringValue,
       }),
     ]);
 
@@ -155,7 +155,10 @@ export class AuthService {
 
   async refreshAccessToken(refreshToken: string) {
     try {
-      const payload = await this.jwtService.verifyAsync<{ sub: string; nickname: string }>(refreshToken, {
+      const payload = await this.jwtService.verifyAsync<{
+        sub: string;
+        nickname: string;
+      }>(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
@@ -170,14 +173,14 @@ export class AuthService {
       const newPayload = { sub: user.id, nickname: user.nickname };
       const accessToken = await this.jwtService.signAsync(newPayload, {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION')!,
+        expiresIn: this.configService.get<string>(
+          'JWT_ACCESS_EXPIRATION',
+        ) as StringValue,
       });
 
       return { accessToken };
     } catch {
-      throw new UnauthorizedException(
-        '리프레시 토큰이 유효하지 않습니다.',
-      );
+      throw new UnauthorizedException('리프레시 토큰이 유효하지 않습니다.');
     }
   }
 }

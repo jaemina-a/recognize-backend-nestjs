@@ -35,7 +35,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleConnection(client: Socket) {
     try {
       this.wsJwtGuard.authenticate(client);
-      this.logger.log(`Connected: ${client.id} (user=${(client.data as { userId: string }).userId})`);  
+      this.logger.log(
+        `Connected: ${client.id} (user=${(client.data as { userId: string }).userId})`,
+      );
     } catch {
       client.emit('chat:error', { message: 'Unauthorized' });
       client.disconnect(true);

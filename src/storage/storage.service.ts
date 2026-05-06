@@ -1,9 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  DeleteObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { diskStorage, StorageEngine } from 'multer';
 import multerS3 from 'multer-s3';
 import { extname, resolve } from 'path';
@@ -30,7 +27,9 @@ export class StorageService implements OnModuleInit {
   private readonly s3?: S3Client;
 
   constructor(private readonly config: ConfigService) {
-    const raw = (this.config.get<string>('STORAGE_DRIVER') ?? 'local').toLowerCase();
+    const raw = (
+      this.config.get<string>('STORAGE_DRIVER') ?? 'local'
+    ).toLowerCase();
     this.driver = raw === 's3' ? 's3' : 'local';
     this.localDir = this.config.get<string>('LOCAL_UPLOAD_DIR') ?? './uploads';
 
@@ -53,7 +52,9 @@ export class StorageService implements OnModuleInit {
   onModuleInit() {
     this.logger.log(
       `Storage driver: ${this.driver}` +
-        (this.driver === 's3' ? ` (bucket=${this.bucket}, region=${this.region})` : ` (dir=${this.localDir})`),
+        (this.driver === 's3'
+          ? ` (bucket=${this.bucket}, region=${this.region})`
+          : ` (dir=${this.localDir})`),
     );
   }
 
@@ -63,7 +64,9 @@ export class StorageService implements OnModuleInit {
       return multerS3({
         s3: this.s3 as never,
         bucket: this.bucket as string,
-        contentType: multerS3.AUTO_CONTENT_TYPE,
+        // AUTO_CONTENT_TYPE을 직접 전달하면 unbound-method 경고가 발생하므로 wrapper로 감쌈
+        contentType: (req, file, cb) =>
+          multerS3.AUTO_CONTENT_TYPE(req, file, cb),
         key: (_req, file, cb) => {
           const key = `photos/${randomUUID()}${extname(file.originalname)}`;
           cb(null, key);
@@ -99,7 +102,9 @@ export class StorageService implements OnModuleInit {
     if (this.driver === 's3') {
       const key = file.key;
       if (!key) {
-        throw new Error('multer-s3 file.key가 없습니다. 업로드 설정을 확인하세요.');
+        throw new Error(
+          'multer-s3 file.key가 없습니다. 업로드 설정을 확인하세요.',
+        );
       }
       if (this.publicUrlBase) {
         return `${this.publicUrlBase}/${key}`;
@@ -131,7 +136,9 @@ export class StorageService implements OnModuleInit {
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
     } catch (err) {
-      this.logger.warn(`사진 삭제 실패 (${photoUrl}): ${(err as Error).message}`);
+      this.logger.warn(
+        `사진 삭제 실패 (${photoUrl}): ${(err as Error).message}`,
+      );
     }
   }
 
@@ -140,9 +147,13 @@ export class StorageService implements OnModuleInit {
       return photoUrl.slice(this.publicUrlBase.length + 1);
     }
     // path-style 또는 virtual-hosted-style
-    const virtualHosted = photoUrl.match(/^https?:\/\/[^/]+\.s3[.-][^/]+\.amazonaws\.com\/(.+)$/i);
+    const virtualHosted = photoUrl.match(
+      /^https?:\/\/[^/]+\.s3[.-][^/]+\.amazonaws\.com\/(.+)$/i,
+    );
     if (virtualHosted) return decodeURIComponent(virtualHosted[1]);
-    const pathStyle = photoUrl.match(/^https?:\/\/s3[.-][^/]+\.amazonaws\.com\/[^/]+\/(.+)$/i);
+    const pathStyle = photoUrl.match(
+      /^https?:\/\/s3[.-][^/]+\.amazonaws\.com\/[^/]+\/(.+)$/i,
+    );
     if (pathStyle) return decodeURIComponent(pathStyle[1]);
     return null;
   }

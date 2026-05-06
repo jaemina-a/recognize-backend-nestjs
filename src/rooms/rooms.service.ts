@@ -114,11 +114,9 @@ export class RoomsService {
 
     // 채팅방이 없으면 생성 + 시스템 메시지
     const chatRoom = await this.chatService.ensureChatRoomForRoom(room.id);
-    await this.chatService.createSystemMessage(
-      chatRoom.id,
-      'member_joined',
-      { userId },
-    );
+    await this.chatService.createSystemMessage(chatRoom.id, 'member_joined', {
+      userId,
+    });
 
     return this.getRoomDetail(room.id, userId);
   }

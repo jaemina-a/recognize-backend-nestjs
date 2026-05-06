@@ -67,8 +67,7 @@ export class PhotosService {
       where: { roomId: In(roomIds) },
     });
     const colorByKey = new Map<string, string>();
-    for (const m of members)
-      colorByKey.set(`${m.roomId}:${m.userId}`, m.color);
+    for (const m of members) colorByKey.set(`${m.roomId}:${m.userId}`, m.color);
 
     return photos.map((photo) => ({
       id: photo.id,
@@ -212,7 +211,12 @@ export class PhotosService {
       .addSelect('u.nickname', 'nickname')
       .addSelect('rm.color', 'color')
       .orderBy('"uploadDate"', 'ASC')
-      .getRawMany<{ uploadDate: string; userId: string; nickname: string; color: string }>();
+      .getRawMany<{
+        uploadDate: string;
+        userId: string;
+        nickname: string;
+        color: string;
+      }>();
 
     const grouped: Record<
       string,
