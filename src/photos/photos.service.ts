@@ -212,7 +212,7 @@ export class PhotosService {
       .addSelect('u.nickname', 'nickname')
       .addSelect('rm.color', 'color')
       .orderBy('"uploadDate"', 'ASC')
-      .getRawMany();
+      .getRawMany<{ uploadDate: string; userId: string; nickname: string; color: string }>();
 
     const grouped: Record<
       string,

@@ -51,7 +51,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() body: JoinPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = client.data.userId as string;
+    const userId = (client.data as { userId: string }).userId;
     try {
       // membership 확인 위해 chatRoom → roomId 조회 + assertMembership
       // serialize하기 위해 service 우회: getMessages 호출은 무거우니 chat-room만 조회
@@ -80,7 +80,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() body: SendPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = client.data.userId as string;
+    const userId = (client.data as { userId: string }).userId;
     try {
       const message = await this.chatService.sendMessage(
         body.chatRoomId,
@@ -100,7 +100,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() body: ReadPayload,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = client.data.userId as string;
+    const userId = (client.data as { userId: string }).userId;
     try {
       const result = await this.chatService.markRead(
         body.chatRoomId,
