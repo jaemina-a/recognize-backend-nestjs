@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   NotFoundException,
   Post,
   Request,
@@ -15,12 +16,26 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('kakao')
   async kakaoLogin(@Body() dto: KakaoLoginDto) {
-    return this.authService.kakaoLogin(dto.accessToken);
+    this.logger.log(
+      `[KAKAO] POST /auth/kakao received. body.accessToken length=${dto?.accessToken?.length ?? 0}`,
+    );
+    try {
+      const result = await this.authService.kakaoLogin(dto.accessToken);
+      this.logger.log(`[KAKAO] login success. userId=${result.user.id}`);
+      return result;
+    } catch (e) {
+      this.logger.error(
+        `[KAKAO] login failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      throw e;
+    }
   }
 
   @Throttle({ default: { ttl: 60_000, limit: 10 } })

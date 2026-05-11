@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,6 +18,8 @@ interface KakaoUserInfo {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -26,14 +28,23 @@ export class AuthService {
   ) {}
 
   async kakaoLogin(kakaoAccessToken: string) {
+    this.logger.log(
+      `[KAKAO] kakaoLogin called. token prefix=${kakaoAccessToken?.slice(0, 8)}... length=${kakaoAccessToken?.length}`,
+    );
+
     // 1. 카카오 API로 사용자 정보 조회
     const kakaoUser = await this.getKakaoUserInfo(kakaoAccessToken);
+    this.logger.log(
+      `[KAKAO] kakao user fetched. id=${kakaoUser.id} nickname=${kakaoUser.kakao_account?.profile?.nickname}`,
+    );
 
     // 2. DB에서 사용자 조회 또는 생성
     const user = await this.findOrCreateUser(kakaoUser);
+    this.logger.log(`[KAKAO] DB user resolved. userId=${user.id}`);
 
     // 3. JWT 토큰 발급
     const tokens = await this.generateTokens(user);
+    this.logger.log(`[KAKAO] tokens issued for userId=${user.id}`);
 
     return {
       user: {
@@ -55,6 +66,10 @@ export class AuthService {
     });
 
     if (!response.ok) {
+      const errorBody = await response.text();
+      this.logger.error(
+        `[KAKAO] kapi /v2/user/me failed. status=${response.status} body=${errorBody}`,
+      );
       throw new UnauthorizedException('카카오 토큰이 유효하지 않습니다.');
     }
 
