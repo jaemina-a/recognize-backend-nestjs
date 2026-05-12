@@ -22,6 +22,6 @@ export class Photo extends BaseEntity {
   @Column({ name: 'photo_url' })
   photoUrl: string;
 
-  @Column({ name: 'uploaded_at', type: 'timestamp', default: () => 'NOW()' })
+  @Column({ name: 'uploaded_at', type: 'timestamptz', default: () => 'NOW()' })
   uploadedAt: Date;
 }
