@@ -93,7 +93,7 @@ export class PhotosService {
       .where('p.room_id = :roomId', { roomId })
       .andWhere('p.uploader_id = :uploaderId', { uploaderId })
       .andWhere(
-        `CAST(p.uploaded_at AT TIME ZONE 'Asia/Seoul' AS date) = CAST(NOW() AT TIME ZONE 'Asia/Seoul' AS date)`,
+        `CAST((p.uploaded_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul' AS date) = CAST(NOW() AT TIME ZONE 'Asia/Seoul' AS date)`,
       )
       .getOne();
 
@@ -159,7 +159,7 @@ export class PhotosService {
       .leftJoinAndSelect('p.uploader', 'uploader')
       .where('p.room_id = :roomId', { roomId })
       .andWhere(
-        `CAST(p.uploaded_at AT TIME ZONE 'Asia/Seoul' AS date) = :todayStr`,
+        `CAST((p.uploaded_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul' AS date) = :todayStr`,
         { todayStr },
       )
       .orderBy('p.uploaded_at', 'DESC')
@@ -196,15 +196,15 @@ export class PhotosService {
       .innerJoin(User, 'u', 'rm.user_id = u.id')
       .where('p.room_id = :roomId', { roomId })
       .andWhere(
-        `CAST(p.uploaded_at AT TIME ZONE 'Asia/Seoul' AS date) >= :startDate`,
+        `CAST((p.uploaded_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul' AS date) >= :startDate`,
         { startDate: startDateStr },
       )
       .andWhere(
-        `CAST(p.uploaded_at AT TIME ZONE 'Asia/Seoul' AS date) < :endDate`,
+        `CAST((p.uploaded_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul' AS date) < :endDate`,
         { endDate: endDateStr },
       )
       .select(
-        `TO_CHAR(p.uploaded_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+        `TO_CHAR((p.uploaded_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
         'uploadDate',
       )
       .addSelect('rm.user_id', 'userId')
@@ -254,7 +254,7 @@ export class PhotosService {
       .leftJoinAndSelect('p.uploader', 'uploader')
       .where('p.room_id = :roomId', { roomId })
       .andWhere(
-        `CAST(p.uploaded_at AT TIME ZONE 'Asia/Seoul' AS date) = :targetDate`,
+        `CAST((p.uploaded_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul' AS date) = :targetDate`,
         { targetDate: date },
       )
       .orderBy('p.uploaded_at', 'ASC')
