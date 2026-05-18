@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Logger,
-  NotFoundException,
   Post,
   Request,
   UseGuards,
