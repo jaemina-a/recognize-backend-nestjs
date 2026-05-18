@@ -172,6 +172,147 @@ export class DevService {
   }
 
   /**
+   * 앱스토어 스크린샷용: 5/1~5/17 기간에 달력 점이 다양하게 보이도록
+   * mock 유저들이 이미 올린 사진 URL을 재사용해 photos row 만 추가.
+   * - 날짜마다 1~4명 랜덤 (모든 날에 다 찍히지는 않음)
+   * - S3 재업로드 없음
+   * - 2026-05-18 은 건드리지 않음
+   * - 동일 (room, uploader, date) 조합이 이미 있으면 skip
+   */
+  async seedMockCalendarDots(): Promise<{
+    ok: true;
+    inserted: number;
+    skipped: number;
+  }> {
+    const roomRows = await this.dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM rooms WHERE name = $1 ORDER BY created_at DESC LIMIT 1`,
+      [ROOM_NAME],
+    );
+    if (roomRows.length === 0) {
+      throw new NotFoundException(`방을 찾을 수 없음: ${ROOM_NAME}`);
+    }
+    const roomId = roomRows[0].id;
+
+    const userRows = await this.dataSource.query<
+      Array<{ id: string; nickname: string }>
+    >(
+      `SELECT id, nickname FROM users WHERE social_provider = 'mock' AND nickname = ANY($1::text[])`,
+      [MOCK_USERS as readonly string[]],
+    );
+    const userIdByName = new Map(userRows.map((r) => [r.nickname, r.id]));
+    for (const name of MOCK_USERS) {
+      if (!userIdByName.has(name)) {
+        throw new NotFoundException(`mock 유저 누락: ${name}`);
+      }
+    }
+
+    // 각 mock 유저가 기존에 올린 photo_url 재사용 (가장 최근 1건)
+    const existingPhotoRows = await this.dataSource.query<
+      Array<{ uploader_id: string; photo_url: string }>
+    >(
+      `SELECT DISTINCT ON (uploader_id) uploader_id, photo_url
+       FROM photos
+       WHERE room_id = $1
+         AND uploader_id = ANY($2::uuid[])
+       ORDER BY uploader_id, uploaded_at DESC`,
+      [roomId, Array.from(userIdByName.values())],
+    );
+    const photoUrlByUploader = new Map(
+      existingPhotoRows.map((r) => [r.uploader_id, r.photo_url]),
+    );
+    for (const name of MOCK_USERS) {
+      const uid = userIdByName.get(name)!;
+      if (!photoUrlByUploader.has(uid)) {
+        throw new ConflictException(
+          `${name} 의 기존 사진 URL을 찾을 수 없습니다. 먼저 /dev/seed-mock-photos 로 사진을 올려주세요.`,
+        );
+      }
+    }
+
+    // 기존 (uploader, KST date) 세트 (중복 방지)
+    const existingKeyRows = await this.dataSource.query<
+      Array<{ uploader_id: string; d: string }>
+    >(
+      `SELECT uploader_id,
+              to_char((uploaded_at AT TIME ZONE 'Asia/Seoul')::date, 'YYYY-MM-DD') AS d
+       FROM photos
+       WHERE room_id = $1
+         AND uploader_id = ANY($2::uuid[])`,
+      [roomId, Array.from(userIdByName.values())],
+    );
+    const existingKeys = new Set(
+      existingKeyRows.map((r) => `${r.uploader_id}|${r.d}`),
+    );
+
+    const pickRandom = <T>(arr: readonly T[], n: number): T[] => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a.slice(0, n);
+    };
+
+    // 5/1 ~ 5/17 중 일부 날짜에만, 인원수도 다양하게
+    const PLAN: ReadonlyArray<{ day: number; count: number }> = [
+      { day: 1, count: 2 },
+      { day: 2, count: 3 },
+      { day: 4, count: 1 },
+      { day: 5, count: 4 },
+      { day: 6, count: 2 },
+      { day: 8, count: 3 },
+      { day: 9, count: 2 },
+      { day: 11, count: 4 },
+      { day: 12, count: 1 },
+      { day: 13, count: 3 },
+      { day: 14, count: 2 },
+      { day: 15, count: 4 },
+      { day: 16, count: 3 },
+      { day: 17, count: 2 },
+    ];
+
+    let inserted = 0;
+    let skipped = 0;
+
+    for (const { day, count } of PLAN) {
+      const date = `2026-05-${String(day).padStart(2, '0')}`;
+      const names = pickRandom(MOCK_USERS, count);
+      for (const nickname of names) {
+        const uploaderId = userIdByName.get(nickname)!;
+        const key = `${uploaderId}|${date}`;
+        if (existingKeys.has(key)) {
+          skipped++;
+          continue;
+        }
+        existingKeys.add(key);
+
+        const photoUrl = photoUrlByUploader.get(uploaderId)!;
+        // 06:00 ~ 23:00 KST 사이 랜덤 시각
+        const minMs = 6 * 3600 * 1000;
+        const maxMs = 23 * 3600 * 1000;
+        const off = minMs + Math.floor(Math.random() * (maxMs - minMs));
+        const h = String(Math.floor(off / 3_600_000)).padStart(2, '0');
+        const m = String(Math.floor((off % 3_600_000) / 60_000)).padStart(
+          2,
+          '0',
+        );
+        const s = String(Math.floor((off % 60_000) / 1000)).padStart(2, '0');
+        const uploadedAt = `${date}T${h}:${m}:${s}+09:00`;
+
+        await this.dataSource.query(
+          `INSERT INTO photos (room_id, uploader_id, photo_url, uploaded_at, created_at, updated_at)
+           VALUES ($1, $2, $3, $4::timestamptz, $4::timestamptz, $4::timestamptz)`,
+          [roomId, uploaderId, photoUrl, uploadedAt],
+        );
+        inserted++;
+      }
+    }
+
+    this.logger.log(`[seed-calendar] inserted=${inserted}, skipped=${skipped}`);
+    return { ok: true, inserted, skipped };
+  }
+
+  /**
    * 앱스토어 스크린샷용 목업 시드.
    * - 기존 mock 유저/방/멤버/채팅방/메시지/읽음만 제거 후 재생성
    * - photos 테이블은 절대 SELECT/DELETE/UPDATE 하지 않음

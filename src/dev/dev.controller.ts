@@ -78,4 +78,13 @@ export class DevController {
       haeun: files.haeun?.[0] as UploadedFileInfo,
     });
   }
+
+  /**
+   * 앱스토어 스크린샷용: 5/1 ~ 5/17 기간에 달력 점이 다양하게 보이도록
+   * 이미 올라간 4장의 photo_url 을 재사용해 row 만 추가.
+   */
+  @Get('seed-mock-calendar')
+  async seedMockCalendar() {
+    return this.devService.seedMockCalendarDots();
+  }
 }
