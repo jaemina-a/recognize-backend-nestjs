@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, ForbiddenException, Get } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { DevService } from './dev.service';
@@ -11,16 +11,22 @@ export class DevController {
     private readonly devService: DevService,
   ) {}
 
+  /**
+   * TODO(임시): DevModule 이 production 에 잠시 노출되어 있는 동안
+   * 파괴적 reset 엔드포인트는 완전히 차단해 둠. 스크린샷 작업 후 원복.
+   */
   @Get('reset')
-  async reset() {
-    await this.dataSource.query(`
-      TRUNCATE TABLE
-        photos,
-        room_members,
-        rooms
-      RESTART IDENTITY CASCADE
-    `);
-    return { message: 'DB 초기화 완료' };
+  reset() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        '/dev/reset 은 production 에서 비활성화되어 있습니다.',
+      );
+    }
+    return this.dataSource
+      .query(
+        `TRUNCATE TABLE photos, room_members, rooms RESTART IDENTITY CASCADE`,
+      )
+      .then(() => ({ message: 'DB 초기화 완료' }));
   }
 
   /**
