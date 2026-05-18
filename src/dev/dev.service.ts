@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { ChatMessage } from '../chat/entities/chat-message.entity';
@@ -122,11 +118,11 @@ export class DevService {
       }
 
       // 안전 가드: mock 유저가 사진 업로더로 참조되어 있으면 중단 (사진 데이터 보존 우선)
-      const photoRefCount = await manager.query(
+      const photoRefRows = await manager.query<Array<{ cnt: number }>>(
         `SELECT COUNT(*)::int AS cnt FROM photos WHERE uploader_id = ANY($1::uuid[])`,
         [mockUserIds],
       );
-      const cnt = Number(photoRefCount?.[0]?.cnt ?? 0);
+      const cnt = Number(photoRefRows[0]?.cnt ?? 0);
       if (cnt > 0) {
         throw new ConflictException(
           `mock 유저가 업로더로 참조된 사진이 ${cnt}건 있습니다. 사진 데이터 보존을 위해 시드를 중단합니다.`,
@@ -134,11 +130,11 @@ export class DevService {
       }
 
       // mock owner 가 만든 방 + mock 유저가 멤버로 속한 방 모두 정리
-      const ownedRooms: { id: string }[] = await manager.query(
+      const ownedRooms = await manager.query<Array<{ id: string }>>(
         `SELECT id FROM rooms WHERE owner_id = ANY($1::uuid[])`,
         [mockUserIds],
       );
-      const memberRooms: { room_id: string }[] = await manager.query(
+      const memberRooms = await manager.query<Array<{ room_id: string }>>(
         `SELECT DISTINCT room_id FROM room_members WHERE user_id = ANY($1::uuid[])`,
         [mockUserIds],
       );
