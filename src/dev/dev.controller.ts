@@ -87,4 +87,10 @@ export class DevController {
   async seedMockCalendar() {
     return this.devService.seedMockCalendarDots();
   }
+
+  /** 스크린샷 작업 종료 후 mock 데이터(유저/방/사진+S3) 일괄 삭제 */
+  @Get('cleanup-mock-all')
+  async cleanupMockAll() {
+    return this.devService.cleanupMockAll();
+  }
 }

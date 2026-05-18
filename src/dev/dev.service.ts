@@ -313,6 +313,104 @@ export class DevService {
   }
 
   /**
+   * 스크린샷 작업 종료 후 일회성 정리:
+   * - mock 유저가 올린 모든 사진 의 S3 객체 삭제 + photos row 삭제
+   * - mock 유저/방/멤버/채팅방/메시지 전부 삭제
+   */
+  async cleanupMockAll(): Promise<{
+    ok: true;
+    deletedUsers: number;
+    deletedPhotos: number;
+  }> {
+    const mockUsers = await this.userRepository.find({
+      where: { socialProvider: 'mock' },
+      select: ['id'],
+    });
+    const mockUserIds = mockUsers.map((u) => u.id);
+    if (mockUserIds.length === 0) {
+      return { ok: true, deletedUsers: 0, deletedPhotos: 0 };
+    }
+
+    // 1) mock 유저가 올린 사진 URL 수집 → S3 삭제
+    const photoRows = await this.dataSource.query<Array<{ photo_url: string }>>(
+      `SELECT photo_url FROM photos WHERE uploader_id = ANY($1::uuid[])`,
+      [mockUserIds],
+    );
+    const uniqueUrls = Array.from(new Set(photoRows.map((p) => p.photo_url)));
+    for (const url of uniqueUrls) {
+      await this.storage.delete(url);
+    }
+
+    // 2) DB 정리 (트랜잭션)
+    await this.dataSource.transaction(async (manager) => {
+      const ownedRooms = await manager.query<Array<{ id: string }>>(
+        `SELECT id FROM rooms WHERE owner_id = ANY($1::uuid[])`,
+        [mockUserIds],
+      );
+      const memberRooms = await manager.query<Array<{ room_id: string }>>(
+        `SELECT DISTINCT room_id FROM room_members WHERE user_id = ANY($1::uuid[])`,
+        [mockUserIds],
+      );
+      const roomIds = Array.from(
+        new Set<string>([
+          ...ownedRooms.map((r) => r.id),
+          ...memberRooms.map((r) => r.room_id),
+        ]),
+      );
+
+      await manager.query(
+        `DELETE FROM photos WHERE uploader_id = ANY($1::uuid[])`,
+        [mockUserIds],
+      );
+      if (roomIds.length > 0) {
+        await manager.query(
+          `DELETE FROM photos WHERE room_id = ANY($1::uuid[])`,
+          [roomIds],
+        );
+        await manager.query(
+          `DELETE FROM chat_messages WHERE chat_room_id IN (SELECT id FROM chat_rooms WHERE room_id = ANY($1::uuid[]))`,
+          [roomIds],
+        );
+        await manager.query(
+          `DELETE FROM chat_reads WHERE chat_room_id IN (SELECT id FROM chat_rooms WHERE room_id = ANY($1::uuid[]))`,
+          [roomIds],
+        );
+        await manager.query(
+          `DELETE FROM chat_rooms WHERE room_id = ANY($1::uuid[])`,
+          [roomIds],
+        );
+        await manager.query(
+          `DELETE FROM room_members WHERE room_id = ANY($1::uuid[])`,
+          [roomIds],
+        );
+        await manager.query(`DELETE FROM rooms WHERE id = ANY($1::uuid[])`, [
+          roomIds,
+        ]);
+      }
+
+      await manager.query(
+        `DELETE FROM room_members WHERE user_id = ANY($1::uuid[])`,
+        [mockUserIds],
+      );
+      await manager.query(
+        `DELETE FROM chat_reads WHERE user_id = ANY($1::uuid[])`,
+        [mockUserIds],
+      );
+      await manager.delete(User, { id: In(mockUserIds) });
+
+      this.logger.log(
+        `[cleanup-mock] users=${mockUserIds.length}, rooms=${roomIds.length}, photos=${photoRows.length}, s3-keys=${uniqueUrls.length}`,
+      );
+    });
+
+    return {
+      ok: true,
+      deletedUsers: mockUserIds.length,
+      deletedPhotos: photoRows.length,
+    };
+  }
+
+  /**
    * 앱스토어 스크린샷용 목업 시드.
    * - 기존 mock 유저/방/멤버/채팅방/메시지/읽음만 제거 후 재생성
    * - photos 테이블은 절대 SELECT/DELETE/UPDATE 하지 않음
