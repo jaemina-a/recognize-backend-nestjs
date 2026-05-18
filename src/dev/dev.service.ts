@@ -1,10 +1,16 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { ChatMessage } from '../chat/entities/chat-message.entity';
 import { ChatRoom } from '../chat/entities/chat-room.entity';
 import { ChatService } from '../chat/chat.service';
 import { RoomsService } from '../rooms/rooms.service';
+import { StorageService, UploadedFileInfo } from '../storage/storage.service';
 import { User } from '../users/entities/user.entity';
 
 /** 시드용 4인 목업 캐릭터 */
@@ -57,7 +63,113 @@ export class DevService {
     private readonly chatMessageRepository: Repository<ChatMessage>,
     private readonly roomsService: RoomsService,
     private readonly chatService: ChatService,
+    private readonly storage: StorageService,
   ) {}
+
+  /**
+   * 앱스토어 스크린샷용: 4명의 mock 유저가 2026-05-18 아침(07:00~10:00 KST) 사이
+   * 사진 1장씩 올린 것처럼 photos 테이블에 행 4개 추가.
+   *
+   * 입력 files: { jiwoo, seoyeon, doyun, haeun } 각 1장 (multer-s3 가 이미 S3 업로드 완료된 상태).
+   *
+   * 안전: 같은 (room, uploader, 2026-05-18) 조합으로 이미 사진이 있으면 ConflictException.
+   *      → 사진 데이터 절대 덮어쓰지 않음.
+   */
+  async seedMockPhotos(files: {
+    jiwoo: UploadedFileInfo;
+    seoyeon: UploadedFileInfo;
+    doyun: UploadedFileInfo;
+    haeun: UploadedFileInfo;
+  }): Promise<{
+    ok: true;
+    inserted: Array<{ nickname: string; photoUrl: string; uploadedAt: string }>;
+  }> {
+    const mapping: Array<{ nickname: MockNickname; file: UploadedFileInfo }> = [
+      { nickname: '지우', file: files.jiwoo },
+      { nickname: '서연', file: files.seoyeon },
+      { nickname: '도윤', file: files.doyun },
+      { nickname: '하은', file: files.haeun },
+    ];
+
+    for (const m of mapping) {
+      if (!m.file) {
+        throw new ConflictException(
+          `누락된 파일: ${m.nickname} (필드명: jiwoo/seoyeon/doyun/haeun 중 ${m.nickname})`,
+        );
+      }
+    }
+
+    // 방 조회
+    const roomRows = await this.dataSource.query<Array<{ id: string }>>(
+      `SELECT id FROM rooms WHERE name = $1 ORDER BY created_at DESC LIMIT 1`,
+      [ROOM_NAME],
+    );
+    if (roomRows.length === 0) {
+      throw new NotFoundException(`방을 찾을 수 없음: ${ROOM_NAME}`);
+    }
+    const roomId = roomRows[0].id;
+
+    // 유저 조회
+    const userRows = await this.dataSource.query<
+      Array<{ id: string; nickname: string }>
+    >(
+      `SELECT id, nickname FROM users WHERE social_provider = 'mock' AND nickname = ANY($1::text[])`,
+      [MOCK_USERS as readonly string[]],
+    );
+    const userIdByName = new Map(userRows.map((r) => [r.nickname, r.id]));
+    for (const name of MOCK_USERS) {
+      if (!userIdByName.has(name)) {
+        throw new NotFoundException(`mock 유저 누락: ${name}`);
+      }
+    }
+
+    // 안전 가드: 2026-05-18 KST 에 이미 사진 있으면 중단
+    const existing = await this.dataSource.query<Array<{ cnt: number }>>(
+      `SELECT COUNT(*)::int AS cnt FROM photos
+       WHERE room_id = $1
+         AND uploader_id = ANY($2::uuid[])
+         AND (uploaded_at AT TIME ZONE 'Asia/Seoul')::date = DATE '2026-05-18'`,
+      [roomId, Array.from(userIdByName.values())],
+    );
+    if (Number(existing[0]?.cnt ?? 0) > 0) {
+      throw new ConflictException(
+        `2026-05-18 에 이미 mock 유저가 올린 사진이 존재합니다. 덮어쓰기 방지를 위해 중단.`,
+      );
+    }
+
+    // 07:00 ~ 10:00 KST 사이 랜덤 시각 (4명 모두 다르게)
+    const randomMorningKst = (): string => {
+      const minMs = 7 * 3600 * 1000;
+      const maxMs = 10 * 3600 * 1000;
+      const off = minMs + Math.floor(Math.random() * (maxMs - minMs));
+      const h = String(Math.floor(off / 3_600_000)).padStart(2, '0');
+      const m = String(Math.floor((off % 3_600_000) / 60_000)).padStart(2, '0');
+      const s = String(Math.floor((off % 60_000) / 1000)).padStart(2, '0');
+      return `2026-05-18T${h}:${m}:${s}+09:00`;
+    };
+
+    const inserted: Array<{
+      nickname: string;
+      photoUrl: string;
+      uploadedAt: string;
+    }> = [];
+    for (const { nickname, file } of mapping) {
+      const uploaderId = userIdByName.get(nickname)!;
+      const photoUrl = this.storage.resolveUploadedUrl(file);
+      const uploadedAt = randomMorningKst();
+      await this.dataSource.query(
+        `INSERT INTO photos (room_id, uploader_id, photo_url, uploaded_at, created_at, updated_at)
+         VALUES ($1, $2, $3, $4::timestamptz, $4::timestamptz, $4::timestamptz)`,
+        [roomId, uploaderId, photoUrl, uploadedAt],
+      );
+      inserted.push({ nickname, photoUrl, uploadedAt });
+      this.logger.log(
+        `[seed-photos] ${nickname} → ${photoUrl} @ ${uploadedAt}`,
+      );
+    }
+
+    return { ok: true, inserted };
+  }
 
   /**
    * 앱스토어 스크린샷용 목업 시드.

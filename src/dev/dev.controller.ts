@@ -1,6 +1,15 @@
-import { Controller, ForbiddenException, Get } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Post,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import type { UploadedFileInfo } from '../storage/storage.service';
 import { DevService } from './dev.service';
 
 @Controller('dev')
@@ -37,5 +46,36 @@ export class DevController {
   @Get('seed-mock')
   async seedMock() {
     return this.devService.seedMock();
+  }
+
+  /**
+   * 앱스토어 스크린샷용: 4명 mock 유저가 2026-05-18 아침에 사진 한 장씩 올린 것처럼 시드.
+   * multipart/form-data 로 jiwoo / seoyeon / doyun / haeun 각 1 파일 업로드.
+   * StorageService 가 자동으로 S3 업로드 → key 를 photoUrl 로 저장.
+   */
+  @Post('seed-mock-photos')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'jiwoo', maxCount: 1 },
+      { name: 'seoyeon', maxCount: 1 },
+      { name: 'doyun', maxCount: 1 },
+      { name: 'haeun', maxCount: 1 },
+    ]),
+  )
+  async seedMockPhotos(
+    @UploadedFiles()
+    files: {
+      jiwoo?: UploadedFileInfo[];
+      seoyeon?: UploadedFileInfo[];
+      doyun?: UploadedFileInfo[];
+      haeun?: UploadedFileInfo[];
+    },
+  ) {
+    return this.devService.seedMockPhotos({
+      jiwoo: files.jiwoo?.[0] as UploadedFileInfo,
+      seoyeon: files.seoyeon?.[0] as UploadedFileInfo,
+      doyun: files.doyun?.[0] as UploadedFileInfo,
+      haeun: files.haeun?.[0] as UploadedFileInfo,
+    });
   }
 }
