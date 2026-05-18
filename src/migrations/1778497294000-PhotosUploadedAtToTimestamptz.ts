@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class PhotosUploadedAtToTimestamptz1778497294000
-  implements MigrationInterface
-{
+export class PhotosUploadedAtToTimestamptz1778497294000 implements MigrationInterface {
   name = 'PhotosUploadedAtToTimestamptz1778497294000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
