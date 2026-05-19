@@ -67,12 +67,12 @@ export class DevService {
   ) {}
 
   /**
-   * 앱스토어 스크린샷용: 4명의 mock 유저가 2026-05-18 아침(07:00~10:00 KST) 사이
+   * 앱스토어 스크린샷용: 4명의 mock 유저가 2026-05-19 아침(07:00~10:00 KST) 사이
    * 사진 1장씩 올린 것처럼 photos 테이블에 행 4개 추가.
    *
    * 입력 files: { jiwoo, seoyeon, doyun, haeun } 각 1장 (multer-s3 가 이미 S3 업로드 완료된 상태).
    *
-   * 안전: 같은 (room, uploader, 2026-05-18) 조합으로 이미 사진이 있으면 ConflictException.
+   * 안전: 같은 (room, uploader, 2026-05-19) 조합으로 이미 사진이 있으면 ConflictException.
    *      → 사진 데이터 절대 덮어쓰지 않음.
    */
   async seedMockPhotos(files: {
@@ -123,17 +123,17 @@ export class DevService {
       }
     }
 
-    // 안전 가드: 2026-05-18 KST 에 이미 사진 있으면 중단
+    // 안전 가드: 2026-05-19 KST 에 이미 사진 있으면 중단
     const existing = await this.dataSource.query<Array<{ cnt: number }>>(
       `SELECT COUNT(*)::int AS cnt FROM photos
        WHERE room_id = $1
          AND uploader_id = ANY($2::uuid[])
-         AND (uploaded_at AT TIME ZONE 'Asia/Seoul')::date = DATE '2026-05-18'`,
+         AND (uploaded_at AT TIME ZONE 'Asia/Seoul')::date = DATE '2026-05-19'`,
       [roomId, Array.from(userIdByName.values())],
     );
     if (Number(existing[0]?.cnt ?? 0) > 0) {
       throw new ConflictException(
-        `2026-05-18 에 이미 mock 유저가 올린 사진이 존재합니다. 덮어쓰기 방지를 위해 중단.`,
+        `2026-05-19 에 이미 mock 유저가 올린 사진이 존재합니다. 덮어쓰기 방지를 위해 중단.`,
       );
     }
 
@@ -145,7 +145,7 @@ export class DevService {
       const h = String(Math.floor(off / 3_600_000)).padStart(2, '0');
       const m = String(Math.floor((off % 3_600_000) / 60_000)).padStart(2, '0');
       const s = String(Math.floor((off % 60_000) / 1000)).padStart(2, '0');
-      return `2026-05-18T${h}:${m}:${s}+09:00`;
+      return `2026-05-19T${h}:${m}:${s}+09:00`;
     };
 
     const inserted: Array<{
@@ -172,11 +172,11 @@ export class DevService {
   }
 
   /**
-   * 앱스토어 스크린샷용: 5/1~5/17 기간에 달력 점이 다양하게 보이도록
+   * 앱스토어 스크린샷용: 5/1~5/18 기간에 달력 점이 다양하게 보이도록
    * mock 유저들이 이미 올린 사진 URL을 재사용해 photos row 만 추가.
    * - 날짜마다 1~4명 랜덤 (모든 날에 다 찍히지는 않음)
    * - S3 재업로드 없음
-   * - 2026-05-18 은 건드리지 않음
+   * - 2026-05-19 는 건들지 않음 (사진 4장이 이미 있음)
    * - 동일 (room, uploader, date) 조합이 이미 있으면 skip
    */
   async seedMockCalendarDots(): Promise<{
@@ -269,6 +269,7 @@ export class DevService {
       { day: 15, count: 4 },
       { day: 16, count: 3 },
       { day: 17, count: 2 },
+      { day: 18, count: 3 },
     ];
 
     let inserted = 0;
