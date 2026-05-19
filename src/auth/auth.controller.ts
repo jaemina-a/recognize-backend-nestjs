@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Logger,
-  NotFoundException,
   Post,
   Request,
   UseGuards,
@@ -41,9 +40,7 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   @Post('mock')
   async mockLogin(@Body() dto: MockLoginDto) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new NotFoundException();
-    }
+    // TODO(임시): 앱스토어 스크린샷용으로 production 에서도 허용. 작업 후 원복할 것.
     return this.authService.mockLogin(dto.nickname);
   }
 
