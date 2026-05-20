@@ -7,7 +7,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
-import { DevModule } from './dev/dev.module';
 import { PhotosModule } from './photos/photos.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { UsersModule } from './users/users.module';
@@ -55,10 +54,6 @@ import { LoggingInterceptor } from './common/logging.interceptor';
     StorageModule,
     PhotosModule,
     ChatModule,
-    // TODO(임시): 앱스토어 스크린샷용 mock 시드를 운영에서 한 번 호출하기 위해 DevModule 을
-    //   production 에서도 등록. 스크린샷 촬영 종료 후 반드시 원래 조건으로 원복할 것.
-    //   파괴적 엔드포인트(/dev/reset)는 dev.controller.ts 에서 임시 비활성화함.
-    DevModule,
     // Rate limit: 1분당 100req (기본). 라우트별 @Throttle 로 강화 가능.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
   ],

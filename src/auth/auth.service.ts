@@ -5,6 +5,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { StringValue } from 'ms';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
+import { AppleOAuthClient } from './apple/apple-oauth.client';
+import { AppleLoginDto } from './dto/apple-login.dto';
+import { verifyAppleIdentityToken } from './apple/apple-token.verifier';
 
 interface KakaoUserInfo {
   id: number;
@@ -25,7 +28,92 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly appleOAuthClient: AppleOAuthClient,
   ) {}
+
+  async appleLogin(dto: AppleLoginDto) {
+    const audience = this.configService.get<string>('APPLE_BUNDLE_ID');
+    if (!audience) {
+      this.logger.error('[APPLE] APPLE_BUNDLE_ID is not configured');
+      throw new UnauthorizedException('Apple 로그인 설정이 누락되었습니다.');
+    }
+
+    this.logger.log(
+      `[APPLE] POST /auth/apple. identityToken length=${dto.identityToken?.length ?? 0}, has authorizationCode=${!!dto.authorizationCode}`,
+    );
+
+    const payload = await verifyAppleIdentityToken({
+      identityToken: dto.identityToken,
+      audience,
+    });
+
+    const appleSub = payload.sub;
+    const email = typeof payload.email === 'string' ? payload.email : null;
+    const subTail = appleSub.slice(-6);
+    this.logger.log(
+      `[APPLE] identityToken verified. sub=*${subTail} hasEmail=${!!email}`,
+    );
+
+    // 1) 기존 Apple 사용자 조회
+    let user = await this.userRepository.findOne({
+      where: { socialId: appleSub, socialProvider: 'apple' },
+    });
+
+    // 2) 신규 사용자 생성 (race condition 대비: 충돌 시 재조회)
+    if (!user) {
+      const baseNickname =
+        dto.nickname?.trim() && dto.nickname.trim().length > 0
+          ? dto.nickname.trim()
+          : `Apple_${subTail}`;
+      try {
+        user = this.userRepository.create({
+          socialProvider: 'apple',
+          socialId: appleSub,
+          email,
+          nickname: await this.ensureUniqueNickname(baseNickname),
+          profileImage: null,
+        });
+        user = await this.userRepository.save(user);
+      } catch (e) {
+        // unique constraint 충돌 시: 동시에 같은 sub로 생성된 경우 재조회
+        const existing = await this.userRepository.findOne({
+          where: { socialId: appleSub, socialProvider: 'apple' },
+        });
+        if (!existing) throw e;
+        user = existing;
+      }
+    }
+
+    // 3) authorizationCode가 있으면 Apple refresh_token 교환 후 저장 (계정 삭제 시 revoke 용)
+    if (dto.authorizationCode && this.appleOAuthClient.isConfigured()) {
+      const appleRefreshToken =
+        await this.appleOAuthClient.exchangeAuthorizationCode(
+          dto.authorizationCode,
+        );
+      if (appleRefreshToken) {
+        user.appleRefreshToken = appleRefreshToken;
+        await this.userRepository.save(user);
+        this.logger.log(`[APPLE] refresh_token stored for userId=${user.id}`);
+      } else {
+        this.logger.warn(
+          `[APPLE] refresh_token exchange returned null. userId=${user.id}`,
+        );
+      }
+    }
+
+    const tokens = await this.generateTokens(user);
+    this.logger.log(`[APPLE] login success. userId=${user.id}`);
+
+    return {
+      user: {
+        id: user.id,
+        nickname: user.nickname,
+        profileImage: user.profileImage,
+        provider: user.socialProvider,
+      },
+      ...tokens,
+    };
+  }
 
   async kakaoLogin(kakaoAccessToken: string) {
     this.logger.log(
@@ -139,33 +227,6 @@ export class AuthService {
     ]);
 
     return { accessToken, refreshToken };
-  }
-
-  async mockLogin(nickname: string) {
-    const socialId = `mock-${nickname}`;
-    let user = await this.userRepository.findOne({
-      where: { socialId, socialProvider: 'mock' },
-    });
-    if (!user) {
-      user = this.userRepository.create({
-        nickname,
-        socialProvider: 'mock',
-        socialId,
-        profileImage: null,
-        email: null,
-      });
-      user = await this.userRepository.save(user);
-    }
-    const tokens = await this.generateTokens(user);
-    return {
-      user: {
-        id: user.id,
-        nickname: user.nickname,
-        profileImage: user.profileImage,
-        provider: user.socialProvider,
-      },
-      ...tokens,
-    };
   }
 
   async refreshAccessToken(refreshToken: string) {

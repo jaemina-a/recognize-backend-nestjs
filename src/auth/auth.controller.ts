@@ -9,8 +9,8 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { AppleLoginDto } from './dto/apple-login.dto';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
-import { MockLoginDto } from './dto/mock-login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
@@ -38,10 +38,21 @@ export class AuthController {
   }
 
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
-  @Post('mock')
-  async mockLogin(@Body() dto: MockLoginDto) {
-    // TODO(임시): 앱스토어 스크린샷용으로 production 에서도 허용. 작업 후 원복할 것.
-    return this.authService.mockLogin(dto.nickname);
+  @Post('apple')
+  async appleLogin(@Body() dto: AppleLoginDto) {
+    this.logger.log(
+      `[APPLE] POST /auth/apple received. identityToken length=${dto?.identityToken?.length ?? 0}`,
+    );
+    try {
+      const result = await this.authService.appleLogin(dto);
+      this.logger.log(`[APPLE] login success. userId=${result.user.id}`);
+      return result;
+    } catch (e) {
+      this.logger.error(
+        `[APPLE] login failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      throw e;
+    }
   }
 
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
